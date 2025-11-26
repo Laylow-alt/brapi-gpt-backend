@@ -1,174 +1,215 @@
-# BrAPI Backend for GPT (Render Free migration)
-[![Sponsor Laylow-alt](https://img.shields.io/badge/Sponsor-GitHub%20Sponsors-pink)](https://github.com/sponsors/Laylow-alt)
+BrAPI Backend for GPT (Render Free Migration) ⚠️ Versão Única / Sem Manutenção Futura
 
-Este projeto é um backend Node.js + TypeScript + Express que funciona como middleware entre um GPT personalizado e a API pública da B3 (brapi.dev). Ele oferece endpoints para cotações, histórico de dividendos e simulações de renda passiva, com cache em memória e lógica de fallback.
+🇧🇷 Português
+Visão Geral
 
-## Aviso de Uso
-⚠️ As simulações de renda passiva são estimativas baseadas em dados históricos. Rentabilidade passada não garante resultados futuros.
+Este projeto é um backend em Node.js + TypeScript + Express que funciona como middleware entre um GPT personalizado e a API pública da B3 (via brapi.dev). Ele fornece endpoints para cotação de ações, histórico de dividendos e simulação de renda passiva (tanto para um ativo quanto para uma carteira). Utiliza cache configurável e lógica de fallback para reduzir requisições externas e melhorar a confiabilidade.
 
-## Funcionalidades
+⚠️ Importante: Este projeto foi desenvolvido como uma versão única, sem compromisso de manutenção, correções ou novas versões no futuro. Use por sua própria conta e risco. Se você gostou e quiser contribuir financeiramente como forma de gratidão ou apoio — agradeço de coração.
 
-- GET `/quote?ticker=...` — cotação e dados fundamentais.
-- GET `/dividends?ticker=...&periodoMeses=...` — histórico de proventos.
-- POST `/renda-passiva` — simulação para ativo único.
-- POST `/carteira-renda-passiva` — simulação para carteira ponderada.
-- Cache em memória com TTL configurável para reduzir chamadas à BrAPI.
-- Fallback para chamadas básicas quando módulos avançados são restritos.
+Funcionalidades
 
-## Porque Render Free
+GET /quote?ticker=... — cotação e dados essenciais de um ativo.
 
-O plano Free da Render permite deploys simples sem exigir faturamento (ao contrário do requisito Blaze do Firebase). Limitações naturais do plano Free:
+GET /dividends?ticker=...&periodoMeses=... — histórico de proventos.
 
-- Instâncias podem dormir (cold start) quando inativas — espere latência na primeira requisição.
-- Limite de recursos (memória/CPU) e tráfego externo — otimize chamadas externas.
-- Requisições externas (BrAPI) têm limites; use cache para minimizar consumo.
+POST /renda-passiva — simulação de crescimento e renda passiva mensal de um ativo com aporte mensal.
 
-## Configuração para Render
+POST /carteira-renda-passiva — simulação para uma carteira diversificada com pesos definidos e aporte mensal total.
 
-### 1. Pré-requisitos locais
-- Node.js (recomendo usar Node 20 para parity com Render)
-- Git e conta GitHub
+Cache com TTL configurável para reduzir uso da API externa.
 
-### 2. Variáveis de ambiente (Render)
+Fallback automático quando dados completos não estão disponíveis (útil para planos gratuitos da brapi.dev).
 
-Adicione estas ENV vars no painel do serviço Render (Environment -> Add Environment Variable):
+Deploy no Render (plano Free)
 
-- `BRAPI_TOKEN` — seu token da brapi.dev
-- `CACHE_TTL_MS` — TTL do cache em ms (padrão 300000 = 5 minutos)
-- `MAX_CACHE_ENTRIES` — limite máximo de entradas no cache (padrão 500)
-- `ENABLE_CACHE_STATS` — `true` para ativar `/cache-stats` (útil para depuração)
- - `ALLOWED_ORIGINS` — lista de origens permitidas separadas por vírgula (ex: `https://chat.openai.com,https://seu-site.com`). Se vazio, libera todos.
- - `ENABLE_CORS_RESTRICT` — `true` para restringir CORS às origens em `ALLOWED_ORIGINS`. Se omitido ou `false`, libera todos.
- - `RATE_LIMIT_WINDOW_MS` — janela do rate limit em ms (padrão 60000).
- - `RATE_LIMIT_MAX` — máximo de requisições por IP por janela (padrão 60).
- - `ENABLE_RATE_LIMIT` — `false` para desabilitar o rate limit. Padrão: habilitado.
+Pré-requisitos:
 
-### 3. Build & Start (Render)
+Node.js (recomenda-se v20)
 
-Ao criar um **Web Service** na Render, preencha:
+Conta no GitHub
 
-- Language: `Node`
-- Branch: `main`
-- Build Command: `npm install && npm run build`
-- Start Command: `npm start`  (usa `node lib/index.js`)
-- Instance Type: `Free`
+Variáveis de ambiente (no painel da Render):
 
-### 4. Deploy
+- `BRAPI_TOKEN` — token da brapi.dev (opcional se usar apenas tickers públicos).
+- `CACHE_TTL_MS` — duração do cache em milissegundos (padrão: 300000 = 5 min).
+- `ENABLE_CACHE_STATS` — `true` para habilitar `/cache-stats` (depuração).
+- `ALLOWED_ORIGINS` — origens permitidas (CSV), ex: `https://chat.openai.com,https://seu-site.com`. Vazio = libera todos.
+- `ENABLE_CORS_RESTRICT` — `true` para restringir CORS às origens informadas; `false`/omitido = libera todos.
+- `RATE_LIMIT_WINDOW_MS` — janela do rate limit (padrão: 60000).
+- `RATE_LIMIT_MAX` — máximo de requisições por IP por janela (padrão: 60).
+- `ENABLE_RATE_LIMIT` — `true` para habilitar o rate limit; `false` para desabilitar.
 
-1. Push seu código para GitHub (branch `main`).
-2. Na Render, conecte o repositório e crie o Web Service conforme acima.
-3. Adicione as Environment Variables citadas.
-4. Acompanhe os logs — se tudo ok, a URL do serviço aparecerá (ex: `https://seu-servico.onrender.com`).
-
-## Testes e endpoints (após deploy)
-
-Exemplos rápidos:
-
-GET cotação:
-```
-GET /quote?ticker=PETR4
-```
-
-GET dividendos:
-```
-GET /dividends?ticker=VALE3&periodoMeses=12
-```
-
-POST renda passiva (JSON):
-```
-POST /renda-passiva
-{
-    "ticker": "ITUB4",
-    "aporteMensal": 500,
-    "anos": 10
-}
-```
-
-POST carteira (JSON):
-```
-POST /carteira-renda-passiva
-{
-    "ativos": [{"ticker":"TAEE11","peso":50},{"ticker":"ITUB4","peso":50}],
-    "aporteMensalTotal": 1000,
-    "anos": 15
-}
-```
-
-Se `ENABLE_CACHE_STATS=true`, acessível apenas para você: `GET /cache-stats` retornará `{ hits, misses, entries }`.
-
-## Notas sobre testes locais
-
-- Use Node 20 para evitar incompatibilidades de tipos (recomendo `nvm`/`nvm-windows`).
-- Para testar localmente:
+Comandos de build/start:
 
 ```pwsh
 npm install
 npm run build
-node lib/index.js
-# então faça requisições para http://localhost:3000
+npm start
 ```
 
-Se o `tsc` falhar localmente por problemas com tipos de dependências (por exemplo `undici-types`) tente:
+Etapas de deploy:
 
-```pwsh
-rm -r node_modules
-rm package-lock.json
-npm install --legacy-peer-deps
-npm run build
+Fazer push do código para o branch main no GitHub.
+
+Criar um Web Service na Render apontando para este repositório, definindo instância como Free.
+
+Adicionar as variáveis de ambiente necessárias.
+
+Aguardar a build e deploy — Render fornecerá a URL pública do serviço.
+
+Exemplos de uso
+
+Cotação (GET):
+
+```http
+GET /quote?ticker=PETR4
 ```
 
-## Integração com GPT (OpenAPI)
+Dividendos (GET):
 
-1. Abra `openapi.yaml` e atualize `servers` com o host do seu serviço Render (se necessário).
-2. Importação por URL (recomendado): use `https://SEU-SERVICO.onrender.com/openapi.yaml` diretamente nas Actions do GPT.
-3. Alternativa: copie e cole o conteúdo de `openapi.yaml` no editor de Actions.
-
-### Endpoint do schema
-- `GET /openapi.yaml` — serve o arquivo OpenAPI com `Content-Type: text/yaml` para facilitar importação por URL.
-
-### Formato de erros padronizado
-Todos os endpoints retornam erros no formato abaixo, conforme `components.schemas.ErrorResponse`:
-
+```http
+GET /dividends?ticker=VALE3&periodoMeses=12
 ```
+
+Simulação renda passiva — ativo único (POST):
+
+```json
+POST /renda-passiva
 {
-    "error": "BadRequest | NotFound | BadGateway | InternalError",
-    "message": "Descrição do erro"
+	"ticker": "ITUB4",
+	"aporteMensal": 500,
+	"anos": 10
 }
 ```
 
-Exemplos:
-- `GET /quote?ticker=` → `400 BadRequest` com `{"error":"BadRequest","message":"Parâmetro 'ticker' é obrigatório."}`
-- `GET /quote?ticker=AAAA1` → `404 NotFound` com `{"error":"NotFound","message":"Ticker não encontrado ou inválido."}`
-- Falhas de provedor externo → `502 BadGateway` com mensagem adequada.
- - Rate limit excedido → `429 TooManyRequests` com `{"error":"TooManyRequests","message":"Rate limit exceeded. Try again later."}` e cabeçalho `Retry-After`.
- - CORS bloqueado (se restrito) → a requisição do browser será bloqueada; para GPT Actions, deixe `ENABLE_CORS_RESTRICT=false` ou `ALLOWED_ORIGINS` vazio.
+Simulação carteira (POST):
 
-## Observações finais — Free tier
+```json
+POST /carteira-renda-passiva
+{
+	"ativos": [ { "ticker": "TAEE11", "peso": 50 }, { "ticker": "ITUB4", "peso": 50 } ],
+	"aporteMensalTotal": 1000,
+	"anos": 15
+}
+```
 
-- Expectativa: baixos custos (Zero se dentro do nível gratuito). Contudo, instâncias dormem e podem haver atrasos em cold start.
-- Recomendo ativar logs e `ENABLE_CACHE_STATS` durante os primeiros dias para calibrar `CACHE_TTL_MS` e `MAX_CACHE_ENTRIES` conforme seu tráfego.
+Integração com GPT / OpenAPI
 
- 
-## Apoie o projeto
-Se este projeto foi útil para você, considere apoiar via GitHub Sponsors.
+- Edite o arquivo `openapi.yaml`, atualizando `servers.url` para a URL pública do seu serviço Render.
+- Importe o schema por URL (recomendado): `https://brapi-gpt-backend.onrender.com/openapi.yaml`.
+- Alternativa: copie/cole o conteúdo do `openapi.yaml` nas Actions do GPT.
 
-- Perfil: `https://github.com/sponsors/Laylow-alt`
-- Qualquer contribuição ajuda a manter a API online e evoluindo.
+Doações / Apoio
 
-Mensagem de agradecimento:
+Se você usou este projeto e achou útil, e quiser contribuir com uma doação por gratidão ou apoio — ficarei muito grato. A contribuição é completamente opcional e não implica em compromissos de manutenção ou atualizações futuras.
 
-"Muito obrigado por apoiar este projeto! Seu suporte viabiliza melhorias contínuas, otimizações de performance e novas funcionalidades educacionais sobre o mercado brasileiro. Conto com você para seguir tornando o acesso a dados e simulações mais acessível para todos. — Laylow-alt"
+🎁 Perfis de doação:
 
-Como ativar o botão “Sponsor”:
+- GitHub Sponsors: https://github.com/sponsors/Laylow-alt
+- Patreon: https://www.patreon.com/cw/Laylow_alt
+- Post de agradecimento: https://www.patreon.com/posts/obrigado-por-e-144421080
 
-- No GitHub, acesse Settings → Options → Sponsorships.
-- Marque “Display a sponsor button” (se disponível) e salve.
-- O botão aparecerá na página do repositório.
+Mensagem de agradecimento (PT):
+> Muito obrigado por apoiar este projeto! Seu suporte mantém o backend online e viabiliza melhorias e manutenção. — Laylow-alt
 
-## Segurança e Publicação
+🇬🇧 English
+Overview
 
-- Não commite `.env` (já ignorado). Defina `BRAPI_TOKEN` apenas nas variáveis de ambiente do serviço (Render).
-- Use `ENABLE_RATE_LIMIT=true` para forks públicos; para uso pessoal pode desativar.
-- Se quiser restringir origens, habilite `ENABLE_CORS_RESTRICT=true` e configure `ALLOWED_ORIGINS`.
-- Revise o histórico do Git antes de tornar público; se algum segredo foi versionado no passado, rotacione o token e limpe o histórico com `git filter-repo` ou BFG.
-- Importação do OpenAPI por URL: `https://brapi-gpt-backend.onrender.com/openapi.yaml`.
+This is a Node.js + TypeScript + Express backend acting as a middleware between a custom GPT and the public B3 stock market API (brapi.dev). It provides endpoints for stock quotes, dividend history, and passive-income simulation (single asset or portfolio). It includes configurable cache and fallback logic to reduce external API usage and improve reliability.
+
+⚠️ Important: This project was built as a one-time release, with no commitment to maintenance, bug fixes, or future versions. Use it at your own risk. If you appreciate the work and wish to send a donation — your support is deeply appreciated.
+
+Features
+
+GET /quote?ticker=... — returns quote and basic data of an asset.
+
+GET /dividends?ticker=...&periodoMeses=... — returns dividend history.
+
+POST /renda-passiva — simulates growth and monthly passive income from a single asset with monthly contributions.
+
+POST /carteira-renda-passiva — simulates a diversified portfolio with defined weights and total monthly contribution.
+
+Configurable cache with TTL to minimize calls to external API.
+
+Automatic fallback when advanced data is unavailable (useful when using free plan of brapi.dev).
+
+Deploy on Render (Free Tier)
+
+Prerequisites:
+
+Node.js (recommended v20)
+
+GitHub account
+
+Environment Variables (in Render dashboard):
+
+- `BRAPI_TOKEN` — your brapi.dev token (optional for public tickers).
+- `CACHE_TTL_MS` — cache TTL in milliseconds (default 300000 = 5 minutes).
+- `ENABLE_CACHE_STATS` — `true` to enable `/cache-stats` (debugging).
+- `ALLOWED_ORIGINS` — allowed origins (CSV), e.g., `https://chat.openai.com,https://your-site.com`. Empty = allow all.
+- `ENABLE_CORS_RESTRICT` — `true` to restrict CORS to `ALLOWED_ORIGINS`; `false`/unset = allow all.
+- `RATE_LIMIT_WINDOW_MS` — rate limit window (default: 60000).
+- `RATE_LIMIT_MAX` — max requests per IP per window (default: 60).
+- `ENABLE_RATE_LIMIT` — `true` to enable; `false` to disable.
+
+Build / Start Commands:
+
+```pwsh
+npm install
+npm run build
+npm start
+```
+
+Deployment Steps:
+
+Push code to main branch on GitHub.
+
+Create a Web Service in Render pointing to this repository; select Free instance.
+
+Add the required environment variables.
+
+Wait for build and deployment — Render will give you a public URL.
+
+Usage Examples
+
+```http
+GET /quote?ticker=PETR4
+GET /dividends?ticker=VALE3&periodoMeses=12
+```
+
+```json
+POST /renda-passiva
+{
+	"ticker": "ITUB4",
+	"aporteMensal": 500,
+	"anos": 10
+}
+```
+
+```json
+POST /carteira-renda-passiva
+{
+	"ativos": [ { "ticker": "TAEE11", "peso": 50 }, { "ticker": "ITUB4", "peso": 50 } ],
+	"aporteMensalTotal": 1000,
+	"anos": 15
+}
+```
+
+GPT / OpenAPI Integration
+
+- Update `servers.url` in `openapi.yaml` to your public Render service URL.
+- Import the schema via URL (recommended): `https://brapi-gpt-backend.onrender.com/openapi.yaml`.
+- Alternatively, paste the content manually when needed.
+
+Donations / Support
+
+If you found this project useful and want to support it via donation — you are welcome and deeply appreciated. This support is purely optional and does not guarantee any ongoing maintenance or future updates.
+
+🎁 Donation profiles:
+
+- GitHub Sponsors: https://github.com/sponsors/Laylow-alt
+- Patreon: https://www.patreon.com/cw/Laylow_alt
+
+Thank-you message (EN):
+> Thank you for supporting this project! Your support keeps the backend online and enables maintenance and improvements. — Laylow-alt
