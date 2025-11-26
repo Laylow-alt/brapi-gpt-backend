@@ -4,12 +4,8 @@ info:
   description: API para buscar dados da B3, histórico de dividendos e simular renda passiva usando brapi.dev. Atua como middleware com cache e fallback.
   version: 1.0.0
 servers:
-  - url: https://{render_host}
-    description: URL do serviço hospedado (Render). Substitua `{render_host}` pelo host do seu serviço, ex: `brapi-gpt-api-estevao.onrender.com`.
-    variables:
-      render_host:
-        default: example.onrender.com
-        description: Hostname do serviço Render (sem https://). Atualize para o seu domínio após o deploy.
+  - url: https://brapi-gpt-backend.onrender.com
+    description: URL do serviço hospedado no Render (Free tier).
 components:
   securitySchemes:
     # Optional: Placeholder for future authentication if needed
