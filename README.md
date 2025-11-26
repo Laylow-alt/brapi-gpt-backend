@@ -151,3 +151,11 @@ Se quiser, eu posso:
 - (A) ajustar `CACHE_TTL_MS` e `MAX_CACHE_ENTRIES` por padrão para minimizar chamadas à BrAPI, ou
 - (B) adicionar suporte por variável `BRAPI_BASE_URL` e documentação para trocar potências de cache.
 Diga qual prefere e eu aplico as alterações.
+
+## Segurança e Publicação
+
+- Não commite `.env` (já ignorado). Defina `BRAPI_TOKEN` apenas nas variáveis de ambiente do serviço (Render).
+- Use `ENABLE_RATE_LIMIT=true` para forks públicos; para uso pessoal pode desativar.
+- Se quiser restringir origens, habilite `ENABLE_CORS_RESTRICT=true` e configure `ALLOWED_ORIGINS`.
+- Revise o histórico do Git antes de tornar público; se algum segredo foi versionado no passado, rotacione o token e limpe o histórico com `git filter-repo` ou BFG.
+- Importação do OpenAPI por URL: `https://brapi-gpt-backend.onrender.com/openapi.yaml`.
