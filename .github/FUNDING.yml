@@ -1,0 +1,21 @@
+# Sponsor links configuration for GitHub repository
+# Fill in the platforms you use. Leave others empty or remove them.
+
+# Up to 4 GitHub Sponsors-enabled usernames, e.g., [user1, user2]
+github: ['Laylow-alt']
+
+# Single usernames/handles for each platform (string)
+patreon: ''
+open_collective: ''
+ko_fi: ''
+tidelift: ''
+community_bridge: ''
+liberapay: ''
+issuehunt: ''
+lfx_crowdfunding: ''
+polar: ''
+buy_me_a_coffee: ''
+thanks_dev: ''
+
+# Up to 4 custom URLs, e.g., ['https://example.com/sponsor']
+custom: []

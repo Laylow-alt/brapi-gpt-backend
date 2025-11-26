@@ -1,4 +1,5 @@
 # BrAPI Backend for GPT (Render Free migration)
+[![Sponsor Laylow-alt](https://img.shields.io/badge/Sponsor-GitHub%20Sponsors-pink)](https://github.com/sponsors/Laylow-alt)
 
 Este projeto é um backend Node.js + TypeScript + Express que funciona como middleware entre um GPT personalizado e a API pública da B3 (brapi.dev). Ele oferece endpoints para cotações, histórico de dividendos e simulações de renda passiva, com cache em memória e lógica de fallback.
 
@@ -147,10 +148,22 @@ Exemplos:
 - Expectativa: baixos custos (Zero se dentro do nível gratuito). Contudo, instâncias dormem e podem haver atrasos em cold start.
 - Recomendo ativar logs e `ENABLE_CACHE_STATS` durante os primeiros dias para calibrar `CACHE_TTL_MS` e `MAX_CACHE_ENTRIES` conforme seu tráfego.
 
-Se quiser, eu posso:
-- (A) ajustar `CACHE_TTL_MS` e `MAX_CACHE_ENTRIES` por padrão para minimizar chamadas à BrAPI, ou
-- (B) adicionar suporte por variável `BRAPI_BASE_URL` e documentação para trocar potências de cache.
-Diga qual prefere e eu aplico as alterações.
+ 
+## Apoie o projeto
+Se este projeto foi útil para você, considere apoiar via GitHub Sponsors.
+
+- Perfil: `https://github.com/sponsors/Laylow-alt`
+- Qualquer contribuição ajuda a manter a API online e evoluindo.
+
+Mensagem de agradecimento:
+
+"Muito obrigado por apoiar este projeto! Seu suporte viabiliza melhorias contínuas, otimizações de performance e novas funcionalidades educacionais sobre o mercado brasileiro. Conto com você para seguir tornando o acesso a dados e simulações mais acessível para todos. — Laylow-alt"
+
+Como ativar o botão “Sponsor”:
+
+- No GitHub, acesse Settings → Options → Sponsorships.
+- Marque “Display a sponsor button” (se disponível) e salve.
+- O botão aparecerá na página do repositório.
 
 ## Segurança e Publicação
 
