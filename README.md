@@ -36,6 +36,11 @@ Adicione estas ENV vars no painel do serviço Render (Environment -> Add Environ
 - `CACHE_TTL_MS` — TTL do cache em ms (padrão 300000 = 5 minutos)
 - `MAX_CACHE_ENTRIES` — limite máximo de entradas no cache (padrão 500)
 - `ENABLE_CACHE_STATS` — `true` para ativar `/cache-stats` (útil para depuração)
+ - `ALLOWED_ORIGINS` — lista de origens permitidas separadas por vírgula (ex: `https://chat.openai.com,https://seu-site.com`). Se vazio, libera todos.
+ - `ENABLE_CORS_RESTRICT` — `true` para restringir CORS às origens em `ALLOWED_ORIGINS`. Se omitido ou `false`, libera todos.
+ - `RATE_LIMIT_WINDOW_MS` — janela do rate limit em ms (padrão 60000).
+ - `RATE_LIMIT_MAX` — máximo de requisições por IP por janela (padrão 60).
+ - `ENABLE_RATE_LIMIT` — `false` para desabilitar o rate limit. Padrão: habilitado.
 
 ### 3. Build & Start (Render)
 
@@ -113,8 +118,29 @@ npm run build
 
 ## Integração com GPT (OpenAPI)
 
-1. Abra `openapi.yaml` e atualize `servers` com o host do seu serviço Render (ou mantenha o placeholder para o GPT importar e ajustar).
-2. Importe o `openapi.yaml` na plataforma de Actions do seu GPT e configure a URL.
+1. Abra `openapi.yaml` e atualize `servers` com o host do seu serviço Render (se necessário).
+2. Importação por URL (recomendado): use `https://SEU-SERVICO.onrender.com/openapi.yaml` diretamente nas Actions do GPT.
+3. Alternativa: copie e cole o conteúdo de `openapi.yaml` no editor de Actions.
+
+### Endpoint do schema
+- `GET /openapi.yaml` — serve o arquivo OpenAPI com `Content-Type: text/yaml` para facilitar importação por URL.
+
+### Formato de erros padronizado
+Todos os endpoints retornam erros no formato abaixo, conforme `components.schemas.ErrorResponse`:
+
+```
+{
+    "error": "BadRequest | NotFound | BadGateway | InternalError",
+    "message": "Descrição do erro"
+}
+```
+
+Exemplos:
+- `GET /quote?ticker=` → `400 BadRequest` com `{"error":"BadRequest","message":"Parâmetro 'ticker' é obrigatório."}`
+- `GET /quote?ticker=AAAA1` → `404 NotFound` com `{"error":"NotFound","message":"Ticker não encontrado ou inválido."}`
+- Falhas de provedor externo → `502 BadGateway` com mensagem adequada.
+ - Rate limit excedido → `429 TooManyRequests` com `{"error":"TooManyRequests","message":"Rate limit exceeded. Try again later."}` e cabeçalho `Retry-After`.
+ - CORS bloqueado (se restrito) → a requisição do browser será bloqueada; para GPT Actions, deixe `ENABLE_CORS_RESTRICT=false` ou `ALLOWED_ORIGINS` vazio.
 
 ## Observações finais — Free tier
 

@@ -1,294 +1,190 @@
 openapi: 3.1.0
 info:
   title: BrAPI Financial Assistant
-  description: API para buscar dados da B3, histórico de dividendos e simular renda passiva usando brapi.dev. Atua como middleware com cache e fallback.
-  version: 1.0.0
+  description: >
+    API para buscar dados da B3, histórico de dividendos e simular renda passiva usando brapi.dev.
+    Atua como middleware com cache e fallback, servindo como base para o assistente financeiro educativo
+    que explica conceitos de investimento e renda passiva de forma didática.
+    **Os dados retornados são obtidos via provedores públicos e têm finalidade exclusivamente educacional.**
+  version: 1.1.0
+
 servers:
   - url: https://brapi-gpt-backend.onrender.com
+    description: "Servidor principal com cache e fallback para consultas da B3"
+
+tags:
+  - name: Cotações
+    description: "Consultas a dados de preço, variação e indicadores fundamentais"
+  - name: Dividendos
+    description: "Consulta a proventos e histórico de distribuição de dividendos"
+  - name: Simulações
+    description: "Projeções de renda passiva para ativos ou carteiras"
+
 paths:
   /quote:
     get:
+      tags: [Cotações]
       operationId: getQuote
       summary: Obter cotação e dados fundamentais
-      description: Retorna dados atualizados de um ativo, incluindo preço, variação, volume e setor.
+      description: "Retorna dados atualizados de um ativo da B3, incluindo preço, variação, volume e setor."
       parameters:
         - name: ticker
           in: query
           required: true
-          description: Símbolo da ação (ex: PETR4, VALE3).
+          description: "Símbolo da ação (ex: PETR4, VALE3)."
           schema:
             type: string
             example: "PETR4"
-      responses:
-        "200":
-          description: Sucesso
-          content:
-            application/json:
-              schema:
-                type: object
-                required:
-                  - ticker
-                  - precoAtual
-                  - setor
-                properties:
-                  ticker:
-                    type: string
-                    example: "PETR4"
-                  nome:
-                    type: string
-                    example: "PETROBRAS PN N2"
-                  precoAtual:
-                    type: number
-                    example: 38.50
-                  variacaoPercentualDia:
-                    type: number
-                    example: 1.25
-                  dividendYieldAtual:
-                    type: number
-                    example: 12.5
-                  ultimoFechamento:
-                    type: number
-                    example: 38.00
-                  volume:
-                    type: number
-                    example: 50000000
-                  setor:
-                    type: string
-                    example: "Energy Minerals"
-                  logo:
-                    type: string
-                    example: "https://icons.brapi.dev/icons/PETR4.svg"
-        "400":
-          description: Parâmetro ticker ausente.
-        "404":
-          description: Ticker não encontrado ou inválido.
-        "502":
-          description: Erro de comunicação com a BrAPI.
-
-  /dividends:
-    get:
-      operationId: getDividends
-      summary: Obter histórico de dividendos
-      description: Retorna lista de proventos pagos nos últimos X meses.
+            "200":
+              description: Sucesso
+              content:
+                application/json:
+                  schema:
+                    $ref: '#/components/schemas/QuoteResponse'
       parameters:
         - name: ticker
           in: query
           required: true
+          description: "Código do ativo (ex: VALE3)."
           schema:
             type: string
             example: "VALE3"
         - name: periodoMeses
           in: query
           required: false
+          description: "Período de histórico em meses (padrão: 12)."
           schema:
             type: integer
             default: 12
             example: 12
       responses:
         "200":
-          description: Histórico de dividendos
+          description: "Histórico de dividendos retornado com sucesso."
           content:
             application/json:
+            "200":
+              description: Histórico de dividendos
+              content:
+                application/json:
+                  schema:
+                    $ref: '#/components/schemas/DividendsResponse'
               schema:
-                type: object
-                required:
-                  - ticker
-                  - periodoMeses
-                  - totalNoPeriodo
-                  - dividendos
-                properties:
-                  ticker:
-                    type: string
-                    example: "VALE3"
-                  periodoMeses:
-                    type: integer
-                    example: 12
-                  totalNoPeriodo:
-                    type: number
-                    example: 4.50
-                  dividendos:
-                    type: array
-                    items:
-                      type: object
-                      required:
-                        - dataCom
-                        - valorPorAcao
-                        - tipo
-                      properties:
-                        dataCom:
-                          type: string
-                        valorPorAcao:
-                          type: number
-                          example: 0.50
-                        tipo:
-                          type: string
-                          example: "JCP"
+                $ref: '#/components/schemas/ErrorResponse'
 
-  /renda-passiva:
+  /carteira-renda-passiva:
     post:
-      operationId: simulatePassiveIncome
-      summary: Simular renda passiva (Ativo Único)
-      description: Calcula projeção de renda passiva mensal futura baseada em yield histórico e juros compostos.
+      tags: [Simulações]
+      operationId: simulatePortfolio
+      summary: "Simular carteira de renda passiva"
+      description: "Projeta renda passiva para uma carteira de múltiplos ativos com pesos definidos (soma dos pesos = 100)."
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              type: object
-              required:
-                - ticker
-                - aporteMensal
-                - anos
-              properties:
-                ticker:
-                  type: string
-                  example: "BBAS3"
-                aporteMensal:
-                  type: number
-                  description: Valor do aporte mensal em reais (deve ser maior que zero).
-                  example: 500
-                anos:
-                  type: integer
-                  description: Prazo da simulação em anos (deve ser maior que zero).
-                  example: 10
+              $ref: '#/components/schemas/PortfolioRequest'
       responses:
+        "200":
+          description: "Resultado consolidado da carteira retornado com sucesso."
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PortfolioResponse'
+        "400":
+          description: "Erro de validação — soma dos pesos diferente de 100 ou valores inválidos."
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /health:
+    get:
+      summary: "Verificar status da API"
+      description: "Endpoint de verificação de integridade e disponibilidade da API."
+      tags: [Cotações]
+      responses:
+        "200":
+          description: "API operacional."
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: "ok"
+                  uptime:
+                    type: string
+                    example: "123h45m"
+
+components:
+  schemas:
+    ErrorResponse:
+      type: object
+      required:
+        - error
+        - message
+      properties:
+        error:
+          type: string
+          example: "ValidationError"
+        message:
+          type: string
+          example: "O parâmetro 'anos' deve ser maior que zero."
+
+    QuoteResponse:
+      type: object
+      required:
+        - ticker
+        - precoAtual
+        - setor
+      properties:
+        ticker:
+          type: string
+          example: "PETR4"
+        nome:
+          type: string
+          example: "PETROBRAS PN N2"
+        precoAtual:
+          type: number
+          example: 38.5
+        variacaoPercentualDia:
+          type: number
+          example: 1.25
+        dividendYieldAtual:
+          type: number
+          example: 12.5
+        ultimoFechamento:
+          type: number
+          example: 38
+        volume:
+          type: number
+          example: 50000000
+        setor:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SimulatePassiveIncomeRequest'
+          example: "JCP"
         "200":
           description: Resultado da simulação
           content:
             application/json:
               schema:
-                type: object
-                required:
-                  - ticker
-                  - aporteMensal
-                  - anos
-                  - precoAtual
-                  - dividendYieldAnual
-                  - cotasEstimadas
-                  - patrimonioFinalEstimado
-                  - rendaPassivaMensalEstimativa
-                  - magicNumberCotas
-                properties:
-                  ticker:
-                    type: string
-                  aporteMensal:
-                    type: number
-                  anos:
-                    type: integer
-                  precoAtual:
-                    type: number
-                  dividendYieldAnual:
-                    type: number
-                  cotasEstimadas:
-                    type: integer
-                  patrimonioFinalEstimado:
-                    type: number
-                  rendaPassivaMensalEstimativa:
-                    type: number
-                  magicNumberCotas:
-                    type: number
-        "400":
-          description: Erro de validação (parâmetros inválidos ou menores que zero).
-
-  /carteira-renda-passiva:
-    post:
-      operationId: simulatePortfolio
-      summary: Simular carteira de renda passiva
-      description: Projeta renda passiva para uma carteira de múltiplos ativos com pesos definidos.
-      requestBody:
+                $ref: '#/components/schemas/SimulatePassiveIncomeResponse'
+          example: 500
+        anos:
         required: true
         content:
           application/json:
             schema:
-              type: object
-              required:
-                - ativos
-                - aporteMensalTotal
-                - anos
-              properties:
-                aporteMensalTotal:
-                  type: number
-                  example: 1000
-                anos:
-                  type: integer
-                  example: 15
-                ativos:
-                  type: array
-                  description: Lista de ativos. A soma dos pesos deve ser 100.
-                  items:
-                    type: object
-                    required:
-                      - ticker
-                      - peso
-                    properties:
-                      ticker:
-                        type: string
-                        example: "TAEE11"
-                      peso:
-                        type: number
-                        description: Peso percentual na carteira (0-100).
-                        example: 50
-      responses:
+              $ref: '#/components/schemas/PortfolioRequest'
+        magicNumberCotas:
         "200":
           description: Resultado consolidado da carteira
           content:
             application/json:
               schema:
-                type: object
-                required:
-                  - aporteMensalTotal
-                  - anos
-                  - dividendYieldMedioPonderado
-                  - rendaPassivaMensalTotalEstimativa
-                  - patrimonioTotalEstimado
-                  - ativos
-                properties:
-                  aporteMensalTotal:
-                    type: number
-                    example: 1000
-                  anos:
-                    type: integer
-                    example: 15
-                  dividendYieldMedioPonderado:
-                    type: number
-                    example: 8.5
-                  rendaPassivaMensalTotalEstimativa:
-                    type: number
-                    example: 550.75
-                  patrimonioTotalEstimado:
-                    type: number
-                    example: 150000
-                  ativos:
-                    type: array
-                    items:
-                      type: object
-                      properties:
-                        ticker:
-                          type: string
-                          example: "TAEE11"
-                        aporteMensal:
-                          type: number
-                          example: 500
-                        anos:
-                          type: integer
-                          example: 15
-                        precoAtual:
-                          type: number
-                          example: 42.89
-                        dividendYieldAnual:
-                          type: number
-                          example: 8.5
-                        cotasEstimadas:
-                          type: integer
-                          example: 2098
-                        patrimonioFinalEstimado:
-                          type: number
-                          example: 75000
-                        rendaPassivaMensalEstimativa:
-                          type: number
-                          example: 275.37
-                        magicNumberCotas:
-                          type: integer
-                          example: 196
-        "400":
-          description: Erro de validação (Soma dos pesos != 100 ou valores inválidos).
+                $ref: '#/components/schemas/PortfolioResponse'
+        - message

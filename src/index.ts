@@ -16,8 +16,50 @@ const app = express();
 const PORT = process.env.PORT || 3000; // Render uses the PORT env variable
 
 // Middleware
-app.use(cors({ origin: true }));
+// CORS: allow only configured origins if ENABLE_CORS_RESTRICT=true, else allow all
+const corsRestrict = process.env.ENABLE_CORS_RESTRICT === 'true';
+const allowedOrigins = (process.env.ALLOWED_ORIGINS || '').split(',').map(o => o.trim()).filter(Boolean);
+if (corsRestrict) {
+  app.use(cors({
+    origin: (origin, callback) => {
+      if (!origin) return callback(null, true);
+      if (allowedOrigins.length === 0 || allowedOrigins.includes(origin)) return callback(null, true);
+      return callback(new Error('Not allowed by CORS'));
+    }
+  }));
+} else {
+  app.use(cors({ origin: true }));
+}
 app.use(express.json());
+
+// Simple in-memory rate limiter per IP (can be disabled)
+const RATE_LIMIT_WINDOW_MS = Number(process.env.RATE_LIMIT_WINDOW_MS) || 60_000; // 1 minute
+const RATE_LIMIT_MAX = Number(process.env.RATE_LIMIT_MAX) || 60; // 60 requests per window
+const ENABLE_RATE_LIMIT = process.env.ENABLE_RATE_LIMIT !== 'false'; // enabled by default
+const buckets = new Map<string, { count: number; resetAt: number }>();
+
+if (ENABLE_RATE_LIMIT) {
+  app.use((req, res, next) => {
+    try {
+      const ip = (req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim() || req.socket.remoteAddress || 'unknown';
+      const now = Date.now();
+      const b = buckets.get(ip);
+      if (!b || now > b.resetAt) {
+        buckets.set(ip, { count: 1, resetAt: now + RATE_LIMIT_WINDOW_MS });
+        return next();
+      }
+      if (b.count < RATE_LIMIT_MAX) {
+        b.count += 1;
+        return next();
+      }
+      const retryAfter = Math.max(0, Math.ceil((b.resetAt - now) / 1000));
+      res.setHeader('Retry-After', retryAfter.toString());
+      return res.status(429).json({ error: 'TooManyRequests', message: 'Rate limit exceeded. Try again later.' });
+    } catch (e) {
+      next();
+    }
+  });
+}
 
 // --- Endpoints ---
 
@@ -27,14 +69,14 @@ app.get("/quote", async (req, res) => {
     const ticker = req.query.ticker as string;
 
     if (!ticker) {
-      res.status(400).json({ error: "Parâmetro 'ticker' é obrigatório." });
+      res.status(400).json({ error: "BadRequest", message: "Parâmetro 'ticker' é obrigatório." });
       return;
     }
 
     const data = await brapiService.getStockData(ticker);
 
     if (!data) {
-      res.status(404).json({ error: "Ticker não encontrado." });
+      res.status(404).json({ error: "NotFound", message: "Ticker não encontrado." });
       return;
     }
 
@@ -61,11 +103,11 @@ app.get("/quote", async (req, res) => {
     const status = error.response ? error.response.status : 500;
     
     if (status === 404 || status === 400) {
-        res.status(404).json({ error: "Ticker não encontrado ou inválido." });
+      res.status(404).json({ error: "NotFound", message: "Ticker não encontrado ou inválido." });
     } else if (status === 502 || status >= 503) {
-        res.status(502).json({ error: "Serviço da BrAPI indisponível." });
+      res.status(502).json({ error: "BadGateway", message: "Serviço da BrAPI indisponível." });
     } else {
-        res.status(500).json({ error: "Erro interno do servidor." });
+      res.status(500).json({ error: "InternalError", message: "Erro interno do servidor." });
     }
   }
 });
@@ -77,14 +119,14 @@ app.get("/dividends", async (req, res) => {
     const periodoMeses = parseInt(req.query.periodoMeses as string) || 12;
 
     if (!ticker) {
-      res.status(400).json({ error: "Parâmetro 'ticker' é obrigatório." });
+      res.status(400).json({ error: "BadRequest", message: "Parâmetro 'ticker' é obrigatório." });
       return;
     }
 
     const data = await brapiService.getStockData(ticker);
 
     if (!data) {
-      res.status(404).json({ error: "Ticker não encontrado." });
+      res.status(404).json({ error: "NotFound", message: "Ticker não encontrado." });
       return;
     }
 
@@ -102,9 +144,9 @@ app.get("/dividends", async (req, res) => {
     console.error(error);
     const status = error.response ? error.response.status : 500;
     if (status === 404) {
-      res.status(404).json({ error: "Ticker não encontrado." });
+      res.status(404).json({ error: "NotFound", message: "Ticker não encontrado." });
     } else {
-      res.status(502).json({ error: "Erro ao buscar dados de dividendos." });
+      res.status(502).json({ error: "BadGateway", message: "Erro ao buscar dados de dividendos." });
     }
   }
 });
@@ -161,12 +203,12 @@ app.post("/renda-passiva", async (req, res) => {
     const { ticker, aporteMensal, anos } = req.body as PassiveIncomeRequest;
 
     if (!ticker || aporteMensal === undefined || !anos) {
-      res.status(400).json({ error: "Campos obrigatórios: ticker, aporteMensal, anos" });
+      res.status(400).json({ error: "BadRequest", message: "Campos obrigatórios: ticker, aporteMensal, anos" });
       return;
     }
 
     if (aporteMensal <= 0 || anos <= 0) {
-      res.status(400).json({ error: "Aporte mensal e anos devem ser números positivos maiores que zero." });
+      res.status(400).json({ error: "BadRequest", message: "Aporte mensal e anos devem ser números positivos maiores que zero." });
       return;
     }
 
@@ -177,7 +219,7 @@ app.post("/renda-passiva", async (req, res) => {
     console.error(error);
     const msg = error.message || "Erro na simulação";
     const status = (error.response?.status === 404 || msg.includes("não encontrado")) ? 404 : 500;
-    res.status(status).json({ error: msg });
+    res.status(status).json({ error: status === 404 ? "NotFound" : "InternalError", message: msg });
   }
 });
 
@@ -187,18 +229,18 @@ app.post("/carteira-renda-passiva", async (req, res) => {
     const { ativos, aporteMensalTotal, anos } = req.body as PortfolioRequest;
 
     if (!ativos || !Array.isArray(ativos) || aporteMensalTotal === undefined || !anos) {
-      res.status(400).json({ error: "Body inválido. Requer 'ativos' (array), 'aporteMensalTotal', 'anos'" });
+      res.status(400).json({ error: "BadRequest", message: "Body inválido. Requer 'ativos' (array), 'aporteMensalTotal', 'anos'" });
       return;
     }
 
-    if (aporteMensalTotal <= 0 || anos <= 0) {
-       res.status(400).json({ error: "Aporte total e anos devem ser números positivos maiores que zero." });
+     if (aporteMensalTotal <= 0 || anos <= 0) {
+       res.status(400).json({ error: "BadRequest", message: "Aporte total e anos devem ser números positivos maiores que zero." });
        return;
     }
 
     const totalWeight = ativos.reduce((acc, item) => acc + (item.peso || 0), 0);
     if (totalWeight < 99.0 || totalWeight > 101.0) {
-      res.status(400).json({ error: `A soma dos pesos deve ser 100%. Total atual: ${totalWeight}%` });
+      res.status(400).json({ error: "BadRequest", message: `A soma dos pesos deve ser 100%. Total atual: ${totalWeight}%` });
       return;
     }
 
@@ -231,15 +273,16 @@ app.post("/carteira-renda-passiva", async (req, res) => {
   } catch (error: any) {
     console.error(error);
     const status = error.message?.includes("não encontrado") ? 404 : 500;
-    res.status(status).json({ error: error.message || "Erro na simulação de carteira. Verifique se todos os tickers são válidos." });
+    res.status(status).json({ error: status === 404 ? "NotFound" : "InternalError", message: error.message || "Erro na simulação de carteira. Verifique se todos os tickers são válidos." });
   }
 });
 
 // Health check endpoint
 app.get('/health', (req, res) => {
+  const seconds = Math.floor(process.uptime());
   res.json({ 
     status: 'ok', 
-    uptime: process.uptime(),
+    uptime: `${seconds}s`,
     timestamp: new Date().toISOString()
   });
 });
@@ -259,4 +302,19 @@ if (process.env.ENABLE_CACHE_STATS === 'true') {
 // Start Server
 app.listen(PORT, () => {
   console.log(`Servidor escutando na porta ${PORT}`);
+});
+
+// Serve OpenAPI schema for easy GPT import
+// Note: This serves the built-time schema from project root
+import path from 'path';
+import fs from 'fs';
+
+app.get('/openapi.yaml', (req, res) => {
+  try {
+    const schemaPath = path.resolve(process.cwd(), 'openapi.yaml');
+    const content = fs.readFileSync(schemaPath, 'utf8');
+    res.type('text/yaml').send(content);
+  } catch (e) {
+    res.status(500).json({ error: 'InternalError', message: 'Unable to load OpenAPI schema' });
+  }
 });
