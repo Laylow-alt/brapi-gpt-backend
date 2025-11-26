@@ -1,5 +1,0 @@
-{
-  "name": "Copy of BrAPI Backend for GPT",
-  "description": "A Firebase Functions backend acting as a middleware between OpenAI Custom GPTs and the BrAPI.dev stock market API. It provides endpoints for quotes, dividends, and passive income simulations.",
-  "requestFramePermissions": []
-}
