@@ -163,6 +163,7 @@ paths:
 
   /health:
     get:
+      operationId: getHealth
       summary: "Verificar status da API"
       description: "Endpoint de verificação de integridade e disponibilidade da API."
       tags: [Cotações]
