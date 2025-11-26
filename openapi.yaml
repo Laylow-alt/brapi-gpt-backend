@@ -63,6 +63,9 @@ paths:
                   setor:
                     type: string
                     example: "Energy Minerals"
+                  logo:
+                    type: string
+                    example: "https://icons.brapi.dev/icons/PETR4.svg"
         "400":
           description: Parâmetro ticker ausente.
         "404":
@@ -272,14 +275,29 @@ paths:
                         ticker:
                           type: string
                           example: "TAEE11"
-                        peso:
+                        aporteMensal:
                           type: number
-                          example: 50
-                        rendaPassivaMensalEstimativa:
-                           type: number
-                           example: 275.37
+                          example: 500
+                        anos:
+                          type: integer
+                          example: 15
+                        precoAtual:
+                          type: number
+                          example: 42.89
+                        dividendYieldAnual:
+                          type: number
+                          example: 8.5
+                        cotasEstimadas:
+                          type: integer
+                          example: 2098
                         patrimonioFinalEstimado:
-                           type: number
-                           example: 75000
+                          type: number
+                          example: 75000
+                        rendaPassivaMensalEstimativa:
+                          type: number
+                          example: 275.37
+                        magicNumberCotas:
+                          type: integer
+                          example: 196
         "400":
           description: Erro de validação (Soma dos pesos != 100 ou valores inválidos).
