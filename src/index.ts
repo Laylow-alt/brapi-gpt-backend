@@ -1,5 +1,3 @@
-import { onRequest } from "firebase-functions/v2/https";
-import * as admin from "firebase-admin";
 import express from "express";
 import cors from "cors";
 import * as brapiService from "./services/brapiService";
@@ -12,22 +10,17 @@ import {
   QuoteResponse 
 } from "./services/types";
 
-// Initialize Firebase Admin
-if (!admin.apps.length) {
-    admin.initializeApp();
-}
-
 // Initialize Express App
 const app = express();
+const PORT = process.env.PORT || 3000; // Render uses the PORT env variable
 
 // Middleware
-app.use(cors({ origin: true }) as any);
-app.use(express.json() as any);
+app.use(cors({ origin: true }));
+app.use(express.json());
 
 // --- Endpoints ---
 
-// 1. GET /api/quote
-// Note: Since the function is exported as 'api', this route maps to /api/quote
+// 1. GET /quote
 app.get("/quote", async (req, res) => {
   try {
     const ticker = req.query.ticker as string;
@@ -40,12 +33,10 @@ app.get("/quote", async (req, res) => {
     const data = await brapiService.getStockData(ticker);
 
     if (!data) {
-      // Should have been caught by 404 catch block, but double check
       res.status(404).json({ error: "Ticker não encontrado." });
       return;
     }
 
-    // Calculate approximate DY if not provided explicitly
     const last12mDivs = brapiService.calculateHistoricalDividends(data, 12);
     const calculatedDy = (data.regularMarketPrice > 0) 
       ? (last12mDivs.total / data.regularMarketPrice) * 100 
@@ -78,7 +69,7 @@ app.get("/quote", async (req, res) => {
   }
 });
 
-// 2. GET /api/dividends
+// 2. GET /dividends
 app.get("/dividends", async (req, res) => {
   try {
     const ticker = req.query.ticker as string;
@@ -130,15 +121,9 @@ async function calculateAssetSimulation(
   }
 
   const price = data.regularMarketPrice || 0;
-  // Use last 12 months dividends to estimate Annual Yield
   const last12m = brapiService.calculateHistoricalDividends(data, 12);
-  const annualYield = price > 0 ? last12m.total / price : 0; // decimal format (e.g. 0.08 for 8%)
+  const annualYield = price > 0 ? last12m.total / price : 0;
   
-  // Simulation: Compound Interest with Monthly Contributions
-  // Formula: FV = P * (((1 + r)^n - 1) / r)
-  // Where r is monthly rate, n is total months
-  
-  // Convert annual yield to monthly geometric rate: (1 + annual)^(1/12) - 1
   const monthlyRate = Math.pow(1 + annualYield, 1/12) - 1;
   const totalMonths = anos * 12;
 
@@ -147,20 +132,13 @@ async function calculateAssetSimulation(
   if (monthlyRate > 0) {
     finalValue = aporteMensal * ((Math.pow(1 + monthlyRate, totalMonths) - 1) / monthlyRate);
   } else {
-    // If no yield, just linear accumulation
     finalValue = aporteMensal * totalMonths;
   }
 
   const estimatedShares = price > 0 ? Math.floor(finalValue / price) : 0;
   
-  // Monthly passive income in the future
   const estimatedMonthlyIncome = finalValue * monthlyRate;
 
-  // Magic Number: Cost needed to buy 1 share with dividends
-  // Magic Number (Cotas) = Price / DividendPerShare = Price / (Price * Yield) = 1/Yield?
-  // Actually Magic Number is when MonthlyIncome >= Price.
-  // MonthlyIncome = Shares * Price * MonthlyRate. 
-  // Shares * Price * MonthlyRate >= Price => Shares * MonthlyRate >= 1 => Shares >= 1/MonthlyRate.
   const magicNumberCotas = monthlyRate > 0 ? Math.ceil(1 / monthlyRate) : 0;
 
   return {
@@ -176,12 +154,11 @@ async function calculateAssetSimulation(
   };
 }
 
-// 3. POST /api/renda-passiva
+// 3. POST /renda-passiva
 app.post("/renda-passiva", async (req, res) => {
   try {
     const { ticker, aporteMensal, anos } = req.body as PassiveIncomeRequest;
 
-    // Validation: Check required fields and positive numbers
     if (!ticker || aporteMensal === undefined || !anos) {
       res.status(400).json({ error: "Campos obrigatórios: ticker, aporteMensal, anos" });
       return;
@@ -198,18 +175,16 @@ app.post("/renda-passiva", async (req, res) => {
   } catch (error: any) {
     console.error(error);
     const msg = error.message || "Erro na simulação";
-    // Check if error message came from 404 throw
     const status = (error.response?.status === 404 || msg.includes("não encontrado")) ? 404 : 500;
     res.status(status).json({ error: msg });
   }
 });
 
-// 4. POST /api/carteira-renda-passiva
+// 4. POST /carteira-renda-passiva
 app.post("/carteira-renda-passiva", async (req, res) => {
   try {
     const { ativos, aporteMensalTotal, anos } = req.body as PortfolioRequest;
 
-    // Validation: Check array and basic numbers
     if (!ativos || !Array.isArray(ativos) || aporteMensalTotal === undefined || !anos) {
       res.status(400).json({ error: "Body inválido. Requer 'ativos' (array), 'aporteMensalTotal', 'anos'" });
       return;
@@ -220,27 +195,22 @@ app.post("/carteira-renda-passiva", async (req, res) => {
        return;
     }
 
-    // Validation: Check weight sum (must be close to 100)
     const totalWeight = ativos.reduce((acc, item) => acc + (item.peso || 0), 0);
-    // Allow slight float tolerance (99.0 - 101.0) due to potential UI rounding
     if (totalWeight < 99.0 || totalWeight > 101.0) {
       res.status(400).json({ error: `A soma dos pesos deve ser 100%. Total atual: ${totalWeight}%` });
       return;
     }
 
     const simulationPromises = ativos.map(async (item) => {
-      // Calculate individual contribution based on weight
       const itemContribution = aporteMensalTotal * (item.peso / 100);
       return calculateAssetSimulation(item.ticker, itemContribution, anos);
     });
 
     const results = await Promise.all(simulationPromises);
 
-    // Aggregation
     const totalPassiveIncome = results.reduce((sum, item) => sum + item.rendaPassivaMensalEstimativa, 0);
     const totalPatrimony = results.reduce((sum, item) => sum + item.patrimonioFinalEstimado, 0);
     
-    // Calculate Weighted Average DY
     let weightedDySum = 0;
     ativos.forEach((ativo, index) => {
         weightedDySum += (results[index].dividendYieldAnual * (ativo.peso / 100));
@@ -264,6 +234,19 @@ app.post("/carteira-renda-passiva", async (req, res) => {
   }
 });
 
-// Expose Express App as a single Cloud Function named 'api'
-// Request URL will be: https://[region]-[project].cloudfunctions.net/api/[endpoint]
-export const api = onRequest({ region: "us-central1" }, app as any);
+// Start Server
+// Optional cache stats endpoint (enable with environment variable)
+if (process.env.ENABLE_CACHE_STATS === 'true') {
+  app.get('/cache-stats', (req, res) => {
+    try {
+      const stats = brapiService.getCacheStats ? brapiService.getCacheStats() : { hits: 0, misses: 0, entries: 0 };
+      res.json(stats);
+    } catch (e) {
+      res.status(500).json({ error: 'Unable to read cache stats' });
+    }
+  });
+}
+
+app.listen(PORT, () => {
+  console.log(`Servidor escutando na porta ${PORT}`);
+});

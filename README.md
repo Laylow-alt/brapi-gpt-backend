@@ -1,78 +1,127 @@
-# BrAPI Backend for GPT
+# BrAPI Backend for GPT (Render Free migration)
 
-Este projeto é uma Cloud Function no Firebase que atua como middleware entre GPTs personalizados e a API da B3 (brapi.dev). Ele fornece cotações, histórico de dividendos e simulações de renda passiva, com sistema de cache e tratamento de erros.
+Este projeto é um backend Node.js + TypeScript + Express que funciona como middleware entre um GPT personalizado e a API pública da B3 (brapi.dev). Ele oferece endpoints para cotações, histórico de dividendos e simulações de renda passiva, com cache em memória e lógica de fallback.
 
-## Disclaimer (Aviso Legal)
-⚠️ **Atenção**: As simulações de renda passiva geradas por esta API são **estimativas** baseadas em dados históricos (Dividend Yield dos últimos 12 meses). **Rentabilidade passada não é garantia de rentabilidade futura.** O mercado financeiro é volátil e os pagamentos de proventos podem variar.
+## Aviso de Uso
+⚠️ As simulações de renda passiva são estimativas baseadas em dados históricos. Rentabilidade passada não garante resultados futuros.
 
 ## Funcionalidades
 
-1.  **Cotação (/quote)**: Preço atual, variação, yield e setor.
-2.  **Dividendos (/dividends)**: Histórico de proventos de um período.
-3.  **Simulação Renda Passiva (/renda-passiva)**: Projeção de juros compostos para um ativo.
-4.  **Simulação Carteira (/carteira-renda-passiva)**: Projeção consolidada para múltiplos ativos (com validação de pesos).
-5.  **Cache**: Usa Firebase Realtime Database para economizar requisições à BrAPI.
-6.  **Fallback**: Se os módulos avançados da BrAPI falharem (limite do plano free), tenta buscar apenas a cotação básica.
+- GET `/quote?ticker=...` — cotação e dados fundamentais.
+- GET `/dividends?ticker=...&periodoMeses=...` — histórico de proventos.
+- POST `/renda-passiva` — simulação para ativo único.
+- POST `/carteira-renda-passiva` — simulação para carteira ponderada.
+- Cache em memória com TTL configurável para reduzir chamadas à BrAPI.
+- Fallback para chamadas básicas quando módulos avançados são restritos.
 
-## Limitações da BrAPI (Plano Gratuito)
-*   Limite de **15.000 requisições/mês**.
-*   **1 ticker por requisição**.
-*   Atraso de 15 a 30 minutos nas cotações.
-*   *Nota*: Tickers de teste como `PETR4`, `VALE3`, `MGLU3` e `ITUB4` geralmente funcionam sem token e com mais dados disponíveis.
+## Porque Render Free
 
-## Configuração e Deploy
+O plano Free da Render permite deploys simples sem exigir faturamento (ao contrário do requisito Blaze do Firebase). Limitações naturais do plano Free:
 
-### 1. Pré-requisitos
-*   Node.js 20+
-*   Firebase CLI (`npm install -g firebase-tools`)
-*   Conta na [brapi.dev](https://brapi.dev)
+- Instâncias podem dormir (cold start) quando inativas — espere latência na primeira requisição.
+- Limite de recursos (memória/CPU) e tráfego externo — otimize chamadas externas.
+- Requisições externas (BrAPI) têm limites; use cache para minimizar consumo.
 
-### 2. Instalação
-```bash
-npm install
-```
+## Configuração para Render
 
-### 3. Variáveis de Ambiente
-Configure o token da BrAPI e o tempo de cache.
+### 1. Pré-requisitos locais
+- Node.js (recomendo usar Node 20 para parity com Render)
+- Git e conta GitHub
 
-**Opções de configuração:**
+### 2. Variáveis de ambiente (Render)
 
-*   `BRAPI_TOKEN`: Seu token de acesso (Bearer).
-*   `CACHE_TTL_MS`: Tempo de vida do cache em milissegundos. Padrão: `300000` (5 minutos).
+Adicione estas ENV vars no painel do serviço Render (Environment -> Add Environment Variable):
 
-**Local (.env):**
-```env
-BRAPI_TOKEN=seu_token_aqui
-CACHE_TTL_MS=300000
-```
+- `BRAPI_TOKEN` — seu token da brapi.dev
+- `CACHE_TTL_MS` — TTL do cache em ms (padrão 300000 = 5 minutos)
+- `MAX_CACHE_ENTRIES` — limite máximo de entradas no cache (padrão 500)
+- `ENABLE_CACHE_STATS` — `true` para ativar `/cache-stats` (útil para depuração)
 
-**Produção (Firebase Config):**
-```bash
-firebase functions:config:set brapi.token="SEU_TOKEN" brapi.cache_ttl="300000"
-# Certifique-se que seu código acessa essas variaveis corretamente (via process.env ou functions.config())
-# Neste projeto, usamos process.env, então certifique-se de passar as variáveis no deploy ou usar Secrets.
-```
+### 3. Build & Start (Render)
+
+Ao criar um **Web Service** na Render, preencha:
+
+- Language: `Node`
+- Branch: `main`
+- Build Command: `npm install && npm run build`
+- Start Command: `npm start`  (usa `node lib/index.js`)
+- Instance Type: `Free`
 
 ### 4. Deploy
-```bash
-npm run deploy
-# ou
-firebase deploy --only functions
+
+1. Push seu código para GitHub (branch `main`).
+2. Na Render, conecte o repositório e crie o Web Service conforme acima.
+3. Adicione as Environment Variables citadas.
+4. Acompanhe os logs — se tudo ok, a URL do serviço aparecerá (ex: `https://seu-servico.onrender.com`).
+
+## Testes e endpoints (após deploy)
+
+Exemplos rápidos:
+
+GET cotação:
+```
+GET /quote?ticker=PETR4
 ```
 
-Após o deploy, você receberá uma URL, por exemplo:
-`https://us-central1-seu-projeto.cloudfunctions.net/api`
+GET dividendos:
+```
+GET /dividends?ticker=VALE3&periodoMeses=12
+```
 
-## Integração com GPT (OpenAI)
+POST renda passiva (JSON):
+```
+POST /renda-passiva
+{
+    "ticker": "ITUB4",
+    "aporteMensal": 500,
+    "anos": 10
+}
+```
 
-1.  Vá em **GPTs** > **Create/Configure** > **Actions**.
-2.  Copie o conteúdo de `openapi.yaml`.
-3.  **IMPORTANTE**: Substitua a URL em `servers` pela URL da sua função gerada no passo anterior.
-    *   Substitua `https://us-central1-YOUR_PROJECT_ID.cloudfunctions.net/api` pela sua URL real.
-4.  Authentication: **None** (O token da BrAPI é gerenciado pelo backend).
+POST carteira (JSON):
+```
+POST /carteira-renda-passiva
+{
+    "ativos": [{"ticker":"TAEE11","peso":50},{"ticker":"ITUB4","peso":50}],
+    "aporteMensalTotal": 1000,
+    "anos": 15
+}
+```
 
-## Monitoramento
-Verifique os logs no Console do Firebase para ver:
-*   `[Cache Hit]`: Dados servidos do cache.
-*   `[Cache Miss]`: Requisição feita à API.
-*   `[Fallback Success]`: Uso do mecanismo de segurança quando a API principal falha.
+Se `ENABLE_CACHE_STATS=true`, acessível apenas para você: `GET /cache-stats` retornará `{ hits, misses, entries }`.
+
+## Notas sobre testes locais
+
+- Use Node 20 para evitar incompatibilidades de tipos (recomendo `nvm`/`nvm-windows`).
+- Para testar localmente:
+
+```pwsh
+npm install
+npm run build
+node lib/index.js
+# então faça requisições para http://localhost:3000
+```
+
+Se o `tsc` falhar localmente por problemas com tipos de dependências (por exemplo `undici-types`) tente:
+
+```pwsh
+rm -r node_modules
+rm package-lock.json
+npm install --legacy-peer-deps
+npm run build
+```
+
+## Integração com GPT (OpenAPI)
+
+1. Abra `openapi.yaml` e atualize `servers` com o host do seu serviço Render (ou mantenha o placeholder para o GPT importar e ajustar).
+2. Importe o `openapi.yaml` na plataforma de Actions do seu GPT e configure a URL.
+
+## Observações finais — Free tier
+
+- Expectativa: baixos custos (Zero se dentro do nível gratuito). Contudo, instâncias dormem e podem haver atrasos em cold start.
+- Recomendo ativar logs e `ENABLE_CACHE_STATS` durante os primeiros dias para calibrar `CACHE_TTL_MS` e `MAX_CACHE_ENTRIES` conforme seu tráfego.
+
+Se quiser, eu posso:
+- (A) ajustar `CACHE_TTL_MS` e `MAX_CACHE_ENTRIES` por padrão para minimizar chamadas à BrAPI, ou
+- (B) adicionar suporte por variável `BRAPI_BASE_URL` e documentação para trocar potências de cache.
+Diga qual prefere e eu aplico as alterações.
