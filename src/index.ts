@@ -1,3 +1,4 @@
+import 'dotenv/config';
 import express from "express";
 import cors from "cors";
 import * as brapiService from "./services/brapiService";
@@ -234,7 +235,15 @@ app.post("/carteira-renda-passiva", async (req, res) => {
   }
 });
 
-// Start Server
+// Health check endpoint
+app.get('/health', (req, res) => {
+  res.json({ 
+    status: 'ok', 
+    uptime: process.uptime(),
+    timestamp: new Date().toISOString()
+  });
+});
+
 // Optional cache stats endpoint (enable with environment variable)
 if (process.env.ENABLE_CACHE_STATS === 'true') {
   app.get('/cache-stats', (req, res) => {
@@ -247,6 +256,7 @@ if (process.env.ENABLE_CACHE_STATS === 'true') {
   });
 }
 
+// Start Server
 app.listen(PORT, () => {
   console.log(`Servidor escutando na porta ${PORT}`);
 });
