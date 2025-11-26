@@ -117,7 +117,6 @@ paths:
                       properties:
                         dataCom:
                           type: string
-                          example: "2023-12-01"
                         valorPorAcao:
                           type: number
                           example: 0.50
@@ -189,7 +188,7 @@ paths:
                   magicNumberCotas:
                     type: number
         "400":
-           description: Erro de validação (parâmetros inválidos ou menores que zero).
+          description: Erro de validação (parâmetros inválidos ou menores que zero).
 
   /carteira-renda-passiva:
     post:
