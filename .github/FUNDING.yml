@@ -1,21 +1,12 @@
-# Sponsor links configuration for GitHub repository
-# Fill in the platforms you use. Leave others empty or remove them.
+# .github/FUNDING.yml
 
-# Up to 4 GitHub Sponsors-enabled usernames, e.g., [user1, user2]
+# Meu usuário no GitHub — aparecerá se e quando estiver aprovado no GitHub Sponsors
 github: ['Laylow-alt']
 
-# Single usernames/handles for each platform (string)
-patreon: ''
-open_collective: ''
-ko_fi: ''
-tidelift: ''
-community_bridge: ''
-liberapay: ''
-issuehunt: ''
-lfx_crowdfunding: ''
-polar: ''
-buy_me_a_coffee: ''
-thanks_dev: ''
+# Meu usuário no Patreon
+patreon: Laylow_alt
 
-# Up to 4 custom URLs, e.g., ['https://example.com/sponsor']
-custom: []
+# Links customizados adicionais (opcionais). Você pode incluir o link ao seu post de agradecimento ou página de doação.
+custom:
+  - "https://www.patreon.com/cw/Laylow_alt"
+  - "https://www.patreon.com/posts/obrigado-por-e-144421080"
